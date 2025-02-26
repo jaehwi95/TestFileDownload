@@ -8,36 +8,35 @@
 import Foundation
 
 @MainActor
-class FileDownloadViewModel: ObservableObject {
+final class FileDownloadViewModel: ObservableObject {
     @Published var progress: Double = 0.0
-    @Published var isDownloading = false
     @Published var downloadedFilePath: String?
-    @Published var errorMessage: String?
 
-    let fileURL = "https://feeds.soundcloud.com/stream/1447464973-jonathan-pageau-307491252-275-michael-legaspi.mp3" // Sample 200MB file
+    let fileURL = "https://jsoncompare.org/LearningContainer/SampleFiles/PDF/sample-500mb-pdf-download.pdf"
     
     func startDownload() {
-        guard !isDownloading else { return }
-        
-        isDownloading = true
-        errorMessage = nil
         downloadedFilePath = nil
         progress = 0.0
         
         Task {
-            await self.trackDownloadProgress()
             do {
-                let downloadedURL = try await FileDownloadService.shared.downloadFile(urlString: fileURL)
-                self.downloadedFilePath = downloadedURL.path()
+                let stream = FileDownloadService.shared.downloadFile(urlString: fileURL)
+                for try await event in stream {
+                    switch event {
+                    case .progress(let value):
+                        await MainActor.run {
+                            self.progress = value
+                        }
+                    case .finished(let location):
+                        await MainActor.run {
+                            self.progress = 1.0
+                            self.downloadedFilePath = location.absoluteString
+                        }
+                    }
+                }
             } catch {
-                self.errorMessage = "Download Failed: \(error.localizedDescription)"
+                print("다운로드 에러: \(error)")
             }
-        }
-    }
-    
-    private func trackDownloadProgress() async {
-        for await progress in FileDownloadService.shared.downloadProgress() {
-            self.progress = progress
         }
     }
 }
