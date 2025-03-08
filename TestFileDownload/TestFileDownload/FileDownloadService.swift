@@ -17,15 +17,18 @@ final class FileDownloadService: NSObject, URLSessionDownloadDelegate {
     static let shared = FileDownloadService()
 
     private lazy var session: URLSession = {
-        let config = URLSessionConfiguration.default
+        let config: URLSessionConfiguration = URLSessionConfiguration.background(withIdentifier: "testDownload")
+        config.isDiscretionary = false // 베터리, 네트워크 상태, 전원 연결 상태등을 무시하고 즉시 실행
+        config.sessionSendsLaunchEvents = true // 앱이 종료되었거나 백그라운드 상태일 경우에도 URLSession 이벤트 발생시 시스템이 앱 자동 실행
         return URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue.main)
     }()
-    
-    private var streamContinuation: AsyncThrowingStream<DownloadStatus, Error>.Continuation?
 
     private override init() {
         super.init()
     }
+    
+    
+    private var streamContinuation: AsyncThrowingStream<DownloadStatus, Error>.Continuation?
     
     func downloadFile(urlString: String) -> AsyncThrowingStream<DownloadStatus, Error> {
         guard let url = URL(string: urlString) else {
@@ -40,7 +43,9 @@ final class FileDownloadService: NSObject, URLSessionDownloadDelegate {
             task.resume()
         }
     }
-    
+}
+
+extension FileDownloadService {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         print("Download finished at: \(location)")
         
